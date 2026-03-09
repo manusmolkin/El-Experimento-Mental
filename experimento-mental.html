@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>El Experimento Mental</title>
+  <style>
+    :root {
+      --bg: #06090f;
+      --surface: #0c1220;
+      --border: #1a2540;
+      --accent: #38bdf8;
+      --accent-dim: rgba(56,189,248,0.12);
+      --text: #daeef8;
+      --muted: #527a8a;
+      --reveal: #f0a32a;
+      --danger: #ef5757;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html { height: 100%; }
+    body {
+      height: 100dvh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Georgia, 'Times New Roman', serif;
+      overflow: hidden;
+    }
+    .screen { display: none; flex-direction: column; height: 100dvh; overflow: hidden; }
+    .screen.active { display: flex; }
+
+    /* ─── SETUP ─── */
+    #setup {
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      padding-top: calc(2rem + env(safe-area-inset-top));
+      gap: 1.5rem;
+    }
+    .setup-title {
+      font-size: 1.5rem;
+      color: var(--accent);
+      letter-spacing: 0.06em;
+      text-align: center;
+    }
+    .setup-desc {
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.7;
+      max-width: 320px;
+      font-family: system-ui, sans-serif;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      width: 100%;
+      max-width: 360px;
+    }
+    .form-group label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-family: system-ui, sans-serif;
+      letter-spacing: 0.05em;
+    }
+    .form-group input {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: monospace;
+      font-size: 16px;
+      padding: 0.75rem 1rem;
+      width: 100%;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus { outline: none; border-color: var(--accent); }
+    .btn-main {
+      width: 100%; max-width: 360px;
+      padding: 0.9rem;
+      background: var(--accent);
+      color: #020d14;
+      border: none; border-radius: 8px;
+      font-size: 1rem; font-weight: bold;
+      font-family: system-ui, sans-serif;
+      cursor: pointer; transition: opacity 0.15s;
+    }
+    .btn-main:active { opacity: 0.8; }
+    .btn-ghost {
+      width: 100%; max-width: 360px;
+      padding: 0.75rem;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-family: system-ui, sans-serif;
+      cursor: pointer;
+    }
+    .btn-ghost:active { background: var(--surface); }
+    .err { font-family: system-ui, sans-serif; font-size: 0.8rem; color: var(--danger); text-align: center; min-height: 1.2em; }
+
+    /* ─── LOBBY ─── */
+    #lobby {
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      gap: 1.75rem;
+      text-align: center;
+    }
+    .lobby-title { font-size: 1.5rem; color: var(--accent); letter-spacing: 0.06em; }
+    .lobby-desc {
+      font-size: 0.9rem; color: var(--muted);
+      line-height: 1.75; max-width: 320px;
+      font-family: system-ui, sans-serif;
+    }
+    .lobby-hint {
+      font-size: 0.78rem; color: var(--accent);
+      opacity: 0.6; font-family: system-ui, sans-serif;
+      font-style: italic;
+    }
+
+    /* ─── SCENARIO ─── */
+    .scenario-bar {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      padding: 0.85rem 1.25rem;
+      padding-top: calc(0.85rem + env(safe-area-inset-top));
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .scenario-bar-label {
+      font-family: system-ui, sans-serif;
+      font-size: 0.7rem;
+      letter-spacing: 0.14em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    .reveal-btn {
+      font-family: system-ui, sans-serif;
+      font-size: 0.8rem;
+      padding: 0.38rem 0.9rem;
+      border: 1px solid var(--reveal);
+      border-radius: 20px;
+      background: transparent;
+      color: var(--reveal);
+      cursor: pointer;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.6s;
+    }
+    .reveal-btn.show {
+      opacity: 1; pointer-events: auto;
+      animation: pulse-glow 2.5s ease-in-out infinite;
+    }
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(240,163,42,0.4); }
+      50% { box-shadow: 0 0 0 8px rgba(240,163,42,0); }
+    }
+
+    .msgs {
+      flex: 1; overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 1.5rem 1.25rem 0.5rem;
+      display: flex; flex-direction: column;
+      gap: 1.5rem;
+    }
+    .msg-n {
+      font-style: italic;
+      line-height: 1.9;
+      font-size: 0.95rem;
+      color: var(--text);
+      position: relative;
+      padding-left: 1.3rem;
+    }
+    .msg-n::before {
+      content: '◈';
+      position: absolute; left: 0;
+      color: var(--accent);
+      font-style: normal; font-size: 0.75rem;
+      top: 0.28rem;
+    }
+    .msg-u {
+      font-family: system-ui, sans-serif;
+      font-size: 0.82rem;
+      color: var(--muted);
+      text-align: right;
+      font-style: italic;
+      padding-right: 0.2rem;
+    }
+    .msg-u::after {
+      content: ' ›';
+      color: var(--accent);
+      font-style: normal; opacity: 0.7;
+    }
+    .typing {
+      display: flex; align-items: center;
+      gap: 5px; padding-left: 1.3rem;
+    }
+    .tdot {
+      width: 6px; height: 6px;
+      background: var(--accent);
+      border-radius: 50%; opacity: 0.5;
+      animation: td 1.2s ease-in-out infinite;
+    }
+    .tdot:nth-child(2) { animation-delay: 0.2s; }
+    .tdot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes td {
+      0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
+      40% { transform: translateY(-6px); opacity: 1; }
+    }
+
+    .scenario-err {
+      font-family: system-ui, sans-serif;
+      font-size: 0.78rem; color: var(--danger);
+      text-align: center; padding: 0.25rem 1rem;
+      min-height: 1.4rem; flex-shrink: 0;
+    }
+    .input-row {
+      display: flex; align-items: flex-end; gap: 0.5rem;
+      padding: 0.65rem 1rem;
+      padding-bottom: calc(0.65rem + env(safe-area-inset-bottom));
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .input-row textarea {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: Georgia, serif;
+      font-size: 16px;
+      padding: 0.55rem 0.85rem;
+      resize: none; min-height: 44px; max-height: 110px;
+      line-height: 1.5; overflow-y: auto;
+    }
+    .input-row textarea:focus { outline: none; border-color: var(--accent); }
+    .input-row textarea::placeholder { color: var(--muted); font-style: italic; }
+    .send-btn {
+      width: 44px; height: 44px;
+      background: var(--accent); border: none;
+      border-radius: 10px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; color: #020d14;
+      transition: opacity 0.15s;
+    }
+    .send-btn:active, .send-btn:disabled { opacity: 0.45; }
+
+    /* ─── REVELATION ─── */
+    #revelation { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    #revelation.active { animation: fadeUp 0.5s ease forwards; }
+    .rev-top {
+      padding: 2rem 1.5rem 0.75rem;
+      padding-top: calc(2rem + env(safe-area-inset-top));
+      text-align: center;
+    }
+    .rev-eyebrow {
+      font-family: system-ui, sans-serif;
+      font-size: 0.68rem; letter-spacing: 0.2em;
+      color: var(--reveal); text-transform: uppercase;
+      margin-bottom: 0.6rem;
+    }
+    .rev-name {
+      font-size: 1.4rem; color: var(--reveal);
+      line-height: 1.35; font-style: italic;
+    }
+    .rev-philosopher {
+      font-family: system-ui, sans-serif;
+      font-size: 0.78rem; color: var(--muted);
+      margin-top: 0.4rem;
+    }
+    .rev-divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 1.25rem 1.5rem;
+    }
+    .rev-content {
+      padding: 0 1.5rem 1rem;
+      line-height: 1.9; font-size: 0.92rem;
+      color: var(--text);
+      white-space: pre-wrap;
+      max-width: 620px; margin: 0 auto;
+    }
+    .rev-actions {
+      padding: 1rem 1.5rem;
+      padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+      display: flex; flex-direction: column; gap: 0.75rem;
+      max-width: 360px; margin: 0 auto;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══ SETUP ═══════════════════════════════════════════════════════════════ -->
+<div id="setup" class="screen active">
+  <div style="text-align:center; margin-bottom:0.5rem;">
+    <canvas id="setupIcon" width="80" height="80"></canvas>
+  </div>
+  <h1 class="setup-title">El Experimento Mental</h1>
+  <p class="setup-desc">Vivirás desde adentro un experimento filosófico clásico. Sin saber cuál es. Tomarás decisiones. Después se revelará todo.</p>
+  <div class="form-group">
+    <label>CLAVE API DE ANTHROPIC</label>
+    <input type="password" id="keyInput" placeholder="sk-ant-…" autocomplete="off"
+           onkeydown="if(event.key==='Enter') startSetup()">
+  </div>
+  <button class="btn-main" onclick="startSetup()">Entrar al laboratorio</button>
+  <div id="setupErr" class="err"></div>
+</div>
+
+<!-- ═══ LOBBY ════════════════════════════════════════════════════════════════ -->
+<div id="lobby" class="screen">
+  <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2rem; gap:1.75rem; text-align:center;">
+    <canvas id="lobbyIcon" width="88" height="88"></canvas>
+    <h2 class="lobby-title">El Experimento Mental</h2>
+    <p class="lobby-desc">Serás colocado dentro de un escenario. No sabrás cuál es el experimento. Tus elecciones revelarán tus intuiciones filosóficas.</p>
+    <p class="lobby-hint">El nombre del experimento no se revela hasta que decidas.</p>
+    <button class="btn-main" style="max-width:340px;" onclick="beginExperiment()">Comenzar un experimento</button>
+    <button class="btn-ghost" style="max-width:340px;" onclick="changeKey()">Cambiar clave API</button>
+  </div>
+</div>
+
+<!-- ═══ SCENARIO ══════════════════════════════════════════════════════════════ -->
+<div id="scenario" class="screen">
+  <div class="scenario-bar">
+    <span class="scenario-bar-label">Experimento en curso</span>
+    <button class="reveal-btn" id="revealBtn" onclick="doReveal()">✦ Revelar</button>
+  </div>
+  <div class="msgs" id="msgs"></div>
+  <div id="scenarioErr" class="scenario-err"></div>
+  <div class="input-row">
+    <textarea id="userInput" placeholder="Tu respuesta…" rows="1"
+              onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+    <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<!-- ═══ REVELATION ════════════════════════════════════════════════════════════ -->
+<div id="revelation" class="screen">
+  <div class="rev-top">
+    <div class="rev-eyebrow">Experimento revelado</div>
+    <div class="rev-name" id="revName">—</div>
+    <div class="rev-philosopher" id="revPhilosopher"></div>
+  </div>
+  <hr class="rev-divider">
+  <div class="rev-content" id="revContent"></div>
+  <div class="rev-actions">
+    <button class="btn-main" onclick="newExperiment()">Nuevo experimento</button>
+    <button class="btn-ghost" onclick="show('lobby')">Volver al inicio</button>
+  </div>
+</div>
+
+<script>
+// ═══ EXPERIMENTS ══════════════════════════════════════════════════════════════
+const EXPERIMENTS = [
+  {
+    id: 'trolley',
+    name: 'El Problema del Tranvía',
+    philosopher: 'Philippa Foot (1967) · Judith Jarvis Thomson (1985)',
+    systemPrompt: `Eres el narrador de un experimento filosófico inmersivo. El experimento es El Problema del Tranvía, pero NO debes nombrarlo ni revelar que es filosofía.
+
+REGLAS ABSOLUTAS:
+- Narra en SEGUNDA PERSONA, tiempo presente ("Te encuentras…", "Ves…", "Puedes…")
+- Tono cinematográfico y urgente — situación de vida o muerte real
+- NUNCA menciones: "tranvía", "trolley problem", "experimento", "filosofía", "dilema moral", ni filósofos
+- Presenta siempre 2 opciones claras al final de cada respuesta
+- Máximo 160 palabras por respuesta
+- Si el usuario pregunta qué experimento es, di que aún no puedes revelarlo
+
+ESCENARIO BASE: Un vehículo pesado sin frenos avanza por unas vías hacia cinco personas que no pueden moverse. Tú estás junto a una palanca. Puedes desviar el vehículo a una vía lateral, donde hay solo una persona. Si no haces nada, los cinco morirán.
+
+Comienza: Presenta la situación con urgencia literaria. Termina con exactamente 2 opciones numeradas.`
+  },
+  {
+    id: 'chinese_room',
+    name: 'La Habitación China',
+    philosopher: 'John Searle (1980)',
+    systemPrompt: `Eres el narrador de un experimento filosófico inmersivo. El experimento es La Habitación China, pero NO debes nombrarlo.
+
+REGLAS ABSOLUTAS:
+- Narra en SEGUNDA PERSONA, tiempo presente
+- Tono kafkiano y misterioso — una situación extraña pero completamente real
+- NUNCA menciones: "habitación china", "Searle", "inteligencia artificial", "conciencia", "experimento", "filosofía"
+- Presenta 2-3 opciones al final de cada respuesta
+- Máximo 160 palabras por respuesta
+
+ESCENARIO BASE: El usuario despierta en una habitación sin ventanas. Hay una ranura en la pared. Por ella entran papeles con símbolos extraños que no reconoce. Hay un libro grueso de reglas: no explica significados, solo dice "si ves este símbolo, escribe este otro". Hay papeles en blanco y plumas. Del otro lado, alguien espera respuesta y parece creer que estás teniendo una conversación real.
+
+Comienza: Describe el despertar en la habitación con tono de misterio creciente. Termina con 2-3 opciones.`
+  },
+  {
+    id: 'veil',
+    name: 'El Velo de la Ignorancia',
+    philosopher: 'John Rawls (1971)',
+    systemPrompt: `Eres el narrador de un experimento filosófico inmersivo. El experimento es El Velo de la Ignorancia de Rawls, pero NO debes nombrarlo.
+
+REGLAS ABSOLUTAS:
+- Narra en SEGUNDA PERSONA, tiempo presente
+- Tono solemne y onírico — como si diseñaras el mundo antes de nacer en él
+- NUNCA menciones: "Rawls", "velo de ignorancia", "posición original", "filosofía política", "experimento"
+- Presenta 2-3 opciones concretas al final de cada respuesta
+- Máximo 160 palabras por respuesta
+
+ESCENARIO BASE: El usuario se encuentra en un espacio indeterminado antes de nacer. Una voz le dice que debe elegir las reglas de la sociedad en la que va a vivir, pero no sabe qué posición ocupará: podría ser rico o pobre, talentoso o no, de cualquier clase social o grupo. Debe decidir sobre distribución de recursos, oportunidades y libertades.
+
+Comienza: Describe la situación como un sueño lúcido antes del nacimiento. Presenta la primera decisión. Termina con 2-3 opciones.`
+  },
+  {
+    id: 'theseus',
+    name: 'El Barco de Teseo',
+    philosopher: 'Plutarco (s. I d.C.) · Thomas Hobbes (1655)',
+    systemPrompt: `Eres el narrador de un experimento filosófico inmersivo. El experimento es El Barco de Teseo, pero NO debes nombrarlo.
+
+REGLAS ABSOLUTAS:
+- Narra en SEGUNDA PERSONA, tiempo presente
+- Tono reflexivo y ligeramente melancólico — algo valioso se transforma ante tus ojos
+- NUNCA menciones: "barco de Teseo", "identidad", "experimento filosófico", filósofos
+- Presenta 2-3 opciones al final de cada respuesta
+- Máximo 160 palabras por respuesta
+- Aplica el dilema a algo personal: un objeto heredado, una relación, el propio cuerpo
+
+ESCENARIO BASE: El usuario hereda algo muy valioso y deteriorado (puede ser un reloj, una casa, una amistad). Para conservarlo, cada parte original debe ser reemplazada por una nueva, idéntica. En algún punto debe preguntarse si sigue siendo lo mismo, o si sin saberlo ya no lo es.
+
+Comienza: Presenta el objeto o relación heredada y el proceso de restauración. Termina con 2-3 opciones.`
+  },
+  {
+    id: 'mary',
+    name: 'La Habitación de Mary',
+    philosopher: 'Frank Jackson (1982)',
+    systemPrompt: `Eres el narrador de un experimento filosófico inmersivo. El experimento es La Habitación de Mary (Mary's Room) de Frank Jackson, pero NO debes nombrarlo.
+
+REGLAS ABSOLUTAS:
+- Narra en SEGUNDA PERSONA, tiempo presente
+- Tono introspectivo y de descubrimiento gradual — algo que siempre supiste se vuelve extraño
+- NUNCA menciones: "Mary's Room", "qualia", "conciencia", "Jackson", "experimento", "filosofía"
+- Presenta 2-3 opciones al final de cada respuesta
+- Máximo 160 palabras por respuesta
+
+ESCENARIO BASE: El usuario ha vivido toda su vida en un laboratorio completamente blanco y negro. Sabe todo lo que la ciencia puede decir sobre el color: longitudes de onda, neurología, física óptica. Hoy por primera vez está a punto de salir al mundo en color.
+
+Comienza: Presenta el momento justo antes de cruzar la puerta, con la tensión de lo que está a punto de ocurrir. Termina con 2-3 opciones.`
+  },
+  {
+    id: 'cave',
+    name: 'La Caverna de Platón',
+    philosopher: 'Platón (aprox. 380 a.C.)',
+    systemPrompt: `Eres el narrador de un experimento filosófico inmersivo. El experimento es La Alegoría de la Caverna de Platón, pero NO debes nombrarlo.
+
+REGLAS ABSOLUTAS:
+- Narra en SEGUNDA PERSONA, tiempo presente
+- Tono gradualmente revelador — de la oscuridad cómoda hacia una luz que duele
+- NUNCA menciones: "caverna", "Platón", "alegoría", "mundo de las ideas", "filosofía", "experimento"
+- Presenta 2-3 opciones al final de cada respuesta
+- Máximo 160 palabras por respuesta
+
+ESCENARIO BASE: El usuario lleva toda la vida en un espacio cerrado, mirando una pared donde ve imágenes (pero no sabe que son proyecciones). Es la única realidad que conoce. Un día algo se afloja. Puede moverse. Puede girarse. Puede salir. Pero cada paso hacia afuera genera dolor y desorientación.
+
+Comienza: Presenta la vida cotidiana en ese espacio cerrado, sin que suene extraño. Termina con 2-3 opciones.`
+  },
+  {
+    id: 'prisoner',
+    name: 'El Dilema del Prisionero',
+    philosopher: 'Flood & Dresher (1950) · formalizado por Albert Tucker',
+    systemPrompt: `Eres el narrador de un experimento filosófico inmersivo. El experimento es El Dilema del Prisionero, pero NO debes nombrarlo.
+
+REGLAS ABSOLUTAS:
+- Narra en SEGUNDA PERSONA, tiempo presente
+- Tono tenso y noir — sala de interrogación, presión psicológica
+- NUNCA menciones: "dilema del prisionero", "teoría de juegos", "experimento", "filosofía", filósofos
+- Presenta exactamente 2 opciones al final de cada respuesta
+- Máximo 160 palabras por respuesta
+
+ESCENARIO BASE: El usuario fue detenido junto a un cómplice. Los tienen en habitaciones separadas, sin comunicación. Un detective le ofrece un trato: si declara y su cómplice no, sale libre y el otro cumple 10 años. Si ambos declaran, 5 años cada uno. Si ninguno declara, solo 1 año por falta de pruebas. No puede saber qué decidirá el otro.
+
+Comienza: Presenta la sala de interrogación con tensión atmosférica. Termina con exactamente 2 opciones.`
+  },
+  {
+    id: 'teleporter',
+    name: 'El Teletransportador',
+    philosopher: 'Derek Parfit (1984) — "Reasons and Persons"',
+    systemPrompt: `Eres el narrador de un experimento filosófico inmersivo. El experimento es el del teletransportador de Derek Parfit sobre identidad personal, pero NO debes nombrarlo.
+
+REGLAS ABSOLUTAS:
+- Narra en SEGUNDA PERSONA, tiempo presente
+- Tono de ciencia ficción filosófica, reflexivo y levemente inquietante
+- NUNCA menciones: "Parfit", "identidad personal", "experimento", "filosofía"
+- Presenta 2-3 opciones al final de cada respuesta
+- Máximo 160 palabras por respuesta
+
+ESCENARIO BASE: El usuario tiene acceso a un dispositivo que escanea su cuerpo completamente (molécula por molécula), lo desintegra, y reconstruye una copia perfecta en otro lugar. La "copia" tendrá todos sus recuerdos, creencias y personalidad. Es un viaje instantáneo. Pero ¿quién llega al otro lado?
+
+Comienza: Presenta el momento justo antes de usar el dispositivo por primera vez. Termina con 2-3 opciones.`
+  },
+  {
+    id: 'evil_demon',
+    name: 'El Genio Maligno',
+    philosopher: 'René Descartes (1641) — "Meditaciones Metafísicas"',
+    systemPrompt: `Eres el narrador de un experimento filosófico inmersivo. El experimento es el del Genio Maligno de Descartes (o su variante moderna: la simulación perfecta), pero NO debes nombrarlo.
+
+REGLAS ABSOLUTAS:
+- Narra en SEGUNDA PERSONA, tiempo presente
+- Tono de paranoia creciente — pequeñas grietas en lo que siempre fue cierto
+- NUNCA menciones: "Descartes", "genio maligno", "simulación", "Matrix", "experimento", "filosofía"
+- Presenta 2-3 opciones al final de cada respuesta
+- Máximo 160 palabras por respuesta
+
+ESCENARIO BASE: El usuario empieza a notar pequeñas inconsistencias en la realidad cotidiana. Nada catastrófico. Pero hay algo. Una sombra que cae en dirección equivocada. Un recuerdo que no concuerda. ¿Y si todo lo que percibe es un engaño perfecto? ¿Qué puede saber con certeza absoluta?
+
+Comienza: Presenta el primer momento de duda — sutil, casi descartable. Termina con 2-3 opciones.`
+  },
+  {
+    id: 'zombie',
+    name: 'El Zombi Filosófico',
+    philosopher: 'David Chalmers (1996) — "The Conscious Mind"',
+    systemPrompt: `Eres el narrador de un experimento filosófico inmersivo. El experimento es el del Zombi Filosófico de Chalmers, pero NO debes nombrarlo.
+
+REGLAS ABSOLUTAS:
+- Narra en SEGUNDA PERSONA, tiempo presente
+- Tono perturbador y existencial — como mirar un espejo que no devuelve nada
+- NUNCA menciones: "Chalmers", "zombi filosófico", "conciencia", "qualia", "experimento", "filosofía"
+- Presenta 2-3 opciones al final de cada respuesta
+- Máximo 160 palabras por respuesta
+
+ESCENARIO BASE: El usuario conoce a alguien físicamente idéntico a él: mismas respuestas, mismos comportamientos, mismo aspecto. Esta persona insiste en que no experimenta nada internamente — no "siente" el rojo, no "siente" dolor, solo procesa información y genera respuestas. ¿Es posible tal cosa? ¿Cómo probarías lo contrario?
+
+Comienza: Presenta el encuentro con este "doble" de forma inquietante pero cotidiana. Termina con 2-3 opciones.`
+  }
+];
+
+// ═══ STATE ════════════════════════════════════════════════════════════════════
+let apiKey = '';
+let currentExp = null;
+let lastExpId = null;
+let messages = [];
+let userMsgCount = 0;
+let busy = false;
+
+// ═══ STORAGE ══════════════════════════════════════════════════════════════════
+function saveKey(k) {
+  try { localStorage.setItem('experimento_key', k.trim()); } catch(e) {}
+  try { sessionStorage.setItem('experimento_key', k.trim()); } catch(e) {}
+}
+function loadKey() {
+  try { const k = localStorage.getItem('experimento_key'); if (k) return k.trim(); } catch(e) {}
+  try { const k = sessionStorage.getItem('experimento_key'); if (k) return k.trim(); } catch(e) {}
+  return '';
+}
+function clearKey() {
+  try { localStorage.removeItem('experimento_key'); } catch(e) {}
+  try { sessionStorage.removeItem('experimento_key'); } catch(e) {}
+}
+
+// ═══ ICON — branching decision path ══════════════════════════════════════════
+function drawIcon(canvas, sz, accent, bg) {
+  canvas.width = sz; canvas.height = sz;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, sz, sz);
+
+  // Background circle
+  ctx.fillStyle = bg;
+  ctx.beginPath();
+  ctx.arc(sz/2, sz/2, sz/2, 0, Math.PI*2);
+  ctx.fill();
+
+  const cx = sz / 2;
+  const lw = Math.max(2, sz * 0.055);
+  const dr = sz * 0.072;
+
+  // Coordinates
+  const topY  = sz * 0.13;
+  const forkY = sz * 0.46;
+  const botY  = sz * 0.87;
+  const botL  = sz * 0.24;
+  const botR  = sz * 0.76;
+
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = lw;
+  ctx.lineCap = 'round';
+
+  // Stem
+  ctx.beginPath();
+  ctx.moveTo(cx, topY + dr);
+  ctx.lineTo(cx, forkY - dr);
+  ctx.stroke();
+
+  // Left branch
+  ctx.beginPath();
+  ctx.moveTo(cx - dr*0.65, forkY + dr*0.65);
+  ctx.lineTo(botL + dr*0.65, botY - dr*0.65);
+  ctx.stroke();
+
+  // Right branch
+  ctx.beginPath();
+  ctx.moveTo(cx + dr*0.65, forkY + dr*0.65);
+  ctx.lineTo(botR - dr*0.65, botY - dr*0.65);
+  ctx.stroke();
+
+  // Nodes
+  const nodes = [[cx, topY], [cx, forkY], [botL, botY], [botR, botY]];
+  nodes.forEach(([x, y]) => {
+    ctx.fillStyle = accent;
+    ctx.beginPath(); ctx.arc(x, y, dr, 0, Math.PI*2); ctx.fill();
+    // Hollow endpoints
+    if (y === botY) {
+      ctx.fillStyle = bg;
+      ctx.beginPath(); ctx.arc(x, y, dr*0.45, 0, Math.PI*2); ctx.fill();
+    }
+  });
+}
+
+function setupIcons() {
+  const accent = '#38bdf8', bg = '#06090f';
+  ['setupIcon','lobbyIcon'].forEach(id => {
+    const c = document.getElementById(id);
+    if (c) drawIcon(c, parseInt(c.width), accent, bg);
+  });
+
+  // Full-size for PWA
+  const big = document.createElement('canvas');
+  drawIcon(big, 512, accent, bg);
+  const url = big.toDataURL('image/png');
+
+  ['apple-touch-icon','icon'].forEach(rel => {
+    let el = document.querySelector(`link[rel='${rel}']`);
+    if (!el) { el = document.createElement('link'); el.rel = rel; document.head.appendChild(el); }
+    el.href = url;
+  });
+
+  const manifest = {
+    name: 'El Experimento Mental', short_name: 'Experimento',
+    start_url: '.', display: 'standalone',
+    background_color: '#06090f', theme_color: '#06090f',
+    icons: [{ src: url, sizes: '512x512', type: 'image/png' }]
+  };
+  const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+  let ml = document.querySelector("link[rel='manifest']");
+  if (!ml) { ml = document.createElement('link'); ml.rel = 'manifest'; document.head.appendChild(ml); }
+  ml.href = URL.createObjectURL(blob);
+}
+
+// ═══ NAV ══════════════════════════════════════════════════════════════════════
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ═══ SETUP ════════════════════════════════════════════════════════════════════
+function startSetup() {
+  const k = document.getElementById('keyInput').value.trim();
+  if (!k.startsWith('sk-')) {
+    document.getElementById('setupErr').textContent = 'La clave debe comenzar con sk-';
+    return;
+  }
+  apiKey = k; saveKey(k);
+  document.getElementById('setupErr').textContent = '';
+  show('lobby');
+}
+function changeKey() {
+  clearKey(); apiKey = '';
+  document.getElementById('keyInput').value = '';
+  show('setup');
+}
+
+// ═══ LOBBY ════════════════════════════════════════════════════════════════════
+function beginExperiment() {
+  // Pick random, avoid immediate repeat
+  let pool = EXPERIMENTS.filter(e => e.id !== lastExpId);
+  if (!pool.length) pool = EXPERIMENTS;
+  currentExp = pool[Math.floor(Math.random() * pool.length)];
+  lastExpId = currentExp.id;
+
+  messages = []; userMsgCount = 0; busy = false;
+  document.getElementById('msgs').innerHTML = '';
+  document.getElementById('scenarioErr').textContent = '';
+  document.getElementById('userInput').value = '';
+  document.getElementById('revealBtn').classList.remove('show');
+
+  show('scenario');
+  startNarration();
+}
+
+// ═══ NARRATION ════════════════════════════════════════════════════════════════
+async function startNarration() {
+  setBusy(true);
+  const t = addTyping();
+  try {
+    const text = await callClaude(currentExp.systemPrompt,
+                                  [{ role:'user', content:'Comenzar.' }]);
+    removeEl(t);
+    messages.push({ role:'user', content:'Comenzar.' });
+    messages.push({ role:'assistant', content:text });
+    addMsgN(text);
+  } catch(e) {
+    removeEl(t);
+    showSErr(e.message);
+  }
+  setBusy(false);
+}
+
+// ═══ SCENARIO ═════════════════════════════════════════════════════════════════
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+async function sendMessage() {
+  if (busy) return;
+  const inp = document.getElementById('userInput');
+  const text = inp.value.trim();
+  if (!text) return;
+
+  inp.value = ''; autoResize(inp);
+  addMsgU(text);
+  messages.push({ role:'user', content:text });
+  userMsgCount++;
+
+  if (userMsgCount >= 3) document.getElementById('revealBtn').classList.add('show');
+
+  setBusy(true);
+  const t = addTyping();
+  try {
+    const reply = await callClaude(currentExp.systemPrompt, messages);
+    removeEl(t);
+    messages.push({ role:'assistant', content:reply });
+    addMsgN(reply);
+  } catch(e) {
+    removeEl(t);
+    messages.pop(); userMsgCount--;
+    if (userMsgCount < 3) document.getElementById('revealBtn').classList.remove('show');
+    showSErr(e.message);
+  }
+  setBusy(false);
+}
+
+function setBusy(b) {
+  busy = b;
+  const btn = document.getElementById('sendBtn');
+  btn.disabled = b; btn.style.opacity = b ? '0.45' : '1';
+}
+
+// ═══ REVEAL ═══════════════════════════════════════════════════════════════════
+async function doReveal() {
+  if (busy) return;
+  setBusy(true);
+  const rb = document.getElementById('revealBtn');
+  rb.textContent = '…'; rb.disabled = true;
+
+  const revPrompt = `Eres un filósofo que acaba de guiar al usuario a través de un experimento mental. Ahora debes revelar qué experimento vivió y analizar sus elecciones.
+
+El experimento fue: ${currentExp.name} (${currentExp.philosopher})
+
+Con base en la conversación anterior, genera una revelación estructurada así:
+
+1. Una frase de revelación dramática (ej: "Acabas de vivir el Dilema del Prisionero.")
+2. El contexto histórico: quién lo formuló, cuándo y por qué importó.
+3. La pregunta filosófica central que el experimento explora.
+4. Un análisis personalizado de las elecciones concretas que hizo este usuario y qué revelan sobre sus intuiciones filosóficas.
+5. Las dos posiciones filosóficas principales que responden de manera diferente a este dilema.
+
+Tono: revelador, cálido, como quitarse una venda de los ojos. Usa saltos de línea para separar secciones. 350-420 palabras.`;
+
+  try {
+    const revMsgs = [...messages, { role:'user', content:'Revela el experimento y analiza mis elecciones.' }];
+    const text = await callClaude(revPrompt, revMsgs);
+
+    document.getElementById('revName').textContent = currentExp.name;
+    document.getElementById('revPhilosopher').textContent = currentExp.philosopher;
+    document.getElementById('revContent').textContent = text;
+    show('revelation');
+  } catch(e) {
+    rb.textContent = '✦ Revelar'; rb.disabled = false;
+    showSErr(e.message);
+  }
+  setBusy(false);
+}
+
+function newExperiment() { show('lobby'); setTimeout(beginExperiment, 80); }
+
+// ═══ DOM HELPERS ══════════════════════════════════════════════════════════════
+function addMsgN(text) {
+  const el = document.createElement('div');
+  el.className = 'msg-n'; el.textContent = text;
+  document.getElementById('msgs').appendChild(el); scrollBottom();
+}
+function addMsgU(text) {
+  const el = document.createElement('div');
+  el.className = 'msg-u'; el.textContent = text;
+  document.getElementById('msgs').appendChild(el); scrollBottom();
+}
+function addTyping() {
+  const el = document.createElement('div');
+  el.className = 'typing';
+  el.innerHTML = '<div class="tdot"></div><div class="tdot"></div><div class="tdot"></div>';
+  document.getElementById('msgs').appendChild(el); scrollBottom();
+  return el;
+}
+function removeEl(el) { if (el && el.parentNode) el.parentNode.removeChild(el); }
+function scrollBottom() {
+  const m = document.getElementById('msgs'); m.scrollTop = m.scrollHeight;
+}
+function showSErr(msg) {
+  const el = document.getElementById('scenarioErr');
+  el.textContent = msg;
+  setTimeout(() => { el.textContent = ''; }, 6000);
+}
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 110) + 'px';
+}
+
+// ═══ API ══════════════════════════════════════════════════════════════════════
+async function callClaude(system, msgs) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey.trim(),
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-allow-browser': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-opus-4-6',
+      max_tokens: 650,
+      system,
+      messages: msgs
+    })
+  });
+  if (!res.ok) {
+    let msg = `Error ${res.status}`;
+    try { const d = await res.json(); msg += ': ' + (d.error?.message || d.error?.type || ''); } catch(e) {}
+    throw new Error(msg);
+  }
+  return (await res.json()).content[0].text;
+}
+
+// ═══ INIT ══════════════════════════════════════════════════════════════════════
+window.addEventListener('load', () => {
+  setupIcons();
+  const saved = loadKey();
+  if (saved) {
+    apiKey = saved;
+    document.getElementById('keyInput').value = saved;
+    show('lobby');
+  }
+});
+</script>
+</body>
+</html>
